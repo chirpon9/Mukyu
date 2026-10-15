@@ -1090,9 +1090,14 @@ class BookBuilder:
 
         In game, a flag hides content unless it holds: "mod:curios" needs Curios installed, "!mod:x" needs x absent,
         "debug" needs debug mode, other names are config options a mod sets. The web book has no modpack, so this
-        decides what a reader sees. Called with None for content that has no flag."""
-        # TODO(human)
-        return True
+        decides what a reader sees. Called with None for content that has no flag.
+
+        The site is a complete reference, so it behaves as if every mod were installed: "mod:x" content is shown and
+        "!mod:x" content (written for players without x) is hidden. Other flags are shown."""
+        if not flag:
+            return True
+        flag = flag.strip()
+        return not flag.startswith('!mod:')
 
     def build(self, extra=None):
         res, t = self.res, self.res.t
