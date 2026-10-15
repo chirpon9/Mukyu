@@ -1,6 +1,19 @@
 {
   "mods": [
     {
+      "id": "bloodmagic",
+      "name": "Blood Magic",
+      "namespaces": ["bloodmagic"],
+      "authors": ["WayofTime", "and contributors"],
+      "owner": "WayofTime and the Blood Magic contributors",
+      "url": "https://github.com/WayofTime/BloodMagic",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "pack": "packs/bloodmagic/data.json",
+      "used": "Sanguine Scientiem: its book text, categories, entries, page templates, recipes, GUI, item and block textures, and item and block models (rendered into icons and 3D structures).",
+      "changes": "Modified: the book was converted from the mod's Patchouli JSON into this viewer's format; the mod's page processors were rewritten to fill in its recipe pages; ritual and Blood Altar structures and ritual costs were read from the mod's Java source; item icons and structures were rendered from its models. The book's wording is unchanged. The converter is tools/build_bloodmagic.py."
+    },
+    {
       "id": "enigmaticlegacy",
       "name": "Enigmatic Legacy",
       "namespaces": ["enigmaticlegacy"],

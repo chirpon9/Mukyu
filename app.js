@@ -1127,31 +1127,43 @@ function renderTemplate(page) {
     } else if (c.t === 'image') {
       push(c.x, c.y, c.scale || 1); blit(tex(c.src), 0, 0, c.u, c.v, c.w, c.h, c.tw, c.th); pop();
     } else if (c.t === 'separator') drawSeparator(book, c.x, c.y);
+    else if (c.t === 'tooltip' && inRange(c.x, c.y, c.w, c.h)) setTooltip(c.lines.map(text => ({ text, color: 0xFFFFFF })));
   }
 }
 
 // ------------------------------------------------------------------ 3D (multiblocks, entities) via three.js
+// block models for multiblocks: the main set (blocks.png) first, then each mod pack's own
+const BLOCK_SETS = [];
 const MB3D = {
-  renderer: null, scenes: new Map(), atlasTex: null,
+  renderer: null, scenes: new Map(),
   ensure() {
     if (this.renderer || !window.THREE) return !!this.renderer;
     try {
       this.canvas = document.createElement('canvas');
       this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, alpha: true, antialias: false, preserveDrawingBuffer: true });
       this.renderer.setClearColor(0x000000, 0);
-      const img = IMG['blocks.png'];
-      this.atlasTex = new THREE.Texture(img); this.atlasTex.magFilter = THREE.NearestFilter; this.atlasTex.minFilter = THREE.NearestFilter;
-      this.atlasTex.generateMipmaps = false; this.atlasTex.flipY = false; this.atlasTex.needsUpdate = true;
     } catch (e) { this.renderer = null; this.failed = true; }
     return !!this.renderer;
   },
+  texture(set) {
+    if (!set.tex) {
+      set.tex = new THREE.Texture(set.img); set.tex.magFilter = THREE.NearestFilter; set.tex.minFilter = THREE.NearestFilter;
+      set.tex.generateMipmaps = false; set.tex.flipY = false; set.tex.needsUpdate = true;
+    }
+    return set.tex;
+  },
   build(mb) {
-    const B = DATA.blocks, cols = B.cols, rows = B.rows;
     const layers = mb.pattern, sizeY = layers.length, sizeZ = layers[0].length, sizeX = Math.max(...layers[0].map(r => r.length));
-    const pos = [], uv = [], col = [], idx = [];
     const shade = { up: 1, down: 0.5, north: 0.8, south: 0.8, east: 0.6, west: 0.6 };
-    let n = 0;
-    const tagFallback = (s) => s;
+    // one mesh per atlas the structure's blocks come from
+    const geo = new Map();
+    const find = (state) => {
+      for (const set of BLOCK_SETS) {
+        const quads = set.data.blocks[state] || set.data.blocks[state.split('[')[0]];
+        if (quads) return [set, quads];
+      }
+      return [null, null];
+    };
     layers.forEach((layer, li) => {
       const yy = sizeY - 1 - li;
       layer.forEach((row, z) => {
@@ -1159,9 +1171,12 @@ const MB3D = {
           if (ch === ' ' || ch === '_') return;
           const state = mb.mapping[ch];
           if (!state) return;
-          const quads = B.blocks[state] || B.blocks[state.split('[')[0]] || B.blocks[tagFallback(state)];
+          const [set, quads] = find(state);
           if (!quads) return;
+          if (!geo.has(set)) geo.set(set, { pos: [], uv: [], col: [], idx: [], n: 0 });
+          const { pos, uv, col, idx } = geo.get(set), cols = set.data.cols, rows = set.data.rows;
           for (const q of quads) {
+            const n = geo.get(set).n;
             const t = q.t, tu = (t % cols), tv = Math.floor(t / cols);
             const c = q.c || [1, 1, 1], sh = shade[q.f] || 1;
             for (let k = 0; k < 4; k++) {
@@ -1170,22 +1185,24 @@ const MB3D = {
               col.push(c[0] * sh, c[1] * sh, c[2] * sh);
             }
             idx.push(n, n + 1, n + 2, n, n + 2, n + 3, n + 2, n + 1, n, n + 3, n + 2, n);
-            n += 4;
+            geo.get(set).n += 4;
           }
         });
       });
     });
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    g.setIndex(idx);
-    const mat = new THREE.MeshBasicMaterial({ map: this.atlasTex, vertexColors: true, alphaTest: 0.1, side: THREE.FrontSide, transparent: false });
-    const mesh = new THREE.Mesh(g, mat);
     const scene = new THREE.Scene();
     const pivot = new THREE.Group(); scene.add(pivot);
-    mesh.position.set(-sizeX / 2, -sizeY / 2, -sizeZ / 2);
-    pivot.add(mesh);
+    for (const [set, { pos, uv, col, idx }] of geo) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      g.setIndex(idx);
+      const mat = new THREE.MeshBasicMaterial({ map: this.texture(set), vertexColors: true, alphaTest: 0.1, side: THREE.FrontSide, transparent: false });
+      const mesh = new THREE.Mesh(g, mat);
+      mesh.position.set(-sizeX / 2, -sizeY / 2, -sizeZ / 2);
+      pivot.add(mesh);
+    }
     const diag = Math.sqrt(sizeX * sizeX + sizeZ * sizeZ);
     const scale = Math.min(90 / diag, 90 / sizeY);
     return { scene, pivot, scale, sizeX, sizeY, sizeZ };
@@ -1686,13 +1703,16 @@ async function boot() {
     // mod packs: books generated from other mods, each with its own icon atlas
     const packs = await Promise.all(MODS.mods.filter(m => m.pack).map(m => getJson(m.pack).catch(err => { console.warn(err.message); return null; })));
     const atlases = [{ icons: DATA.icons, file: 'items.png' }];
+    const blockSets = [{ data: DATA.blocks, file: 'blocks.png' }];
     for (const pack of packs.filter(Boolean)) {
       DATA.books.push(...pack.books);
       DATA.itemNames = Object.assign({}, pack.itemNames, DATA.itemNames);
       atlases.push({ icons: pack.icons, file: pack.icons.file });
+      if (pack.blocks) blockSets.push({ data: pack.blocks, file: pack.blocks.file });
     }
-    const images = new Set(['blocks.png', 'entities.png', 'img/vanilla/widgets.png', 'img/vanilla/glint.png']);
+    const images = new Set(['entities.png', 'img/vanilla/widgets.png', 'img/vanilla/glint.png']);
     atlases.forEach(a => images.add(a.file));
+    blockSets.forEach(b => images.add(b.file));
     DATA.font.forEach(f => images.add(f.file));
     const collect = (o) => {
       if (!o || typeof o !== 'object') return;
@@ -1707,6 +1727,7 @@ async function boot() {
     await Promise.all([...images].map(src => loadImage(src).then(im => { IMG[src] = im; }).catch(err => console.warn(err.message))));
     initFont();
     atlases.forEach(a => registerIcons(a.icons, IMG[a.file]));
+    blockSets.forEach(b => { if (IMG[b.file]) BLOCK_SETS.push({ data: b.data, img: IMG[b.file] }); });
     BOOKS = DATA.books;
     BOOKS.forEach(prepareBook);
     BOOKS.forEach(b => { b.mod = MODS.mods.find(m => (m.namespaces || [m.id]).includes(b.ns)) || null; });

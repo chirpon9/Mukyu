@@ -2,6 +2,14 @@
 
 This site shows Patchouli books from Minecraft mods in the browser. It combines work by several people, and each part stays under its owner's license. None of the books belong to this site; they belong to the mod authors named below.
 
+## Blood Magic: Sanguine Scientiem
+
+- **Files:** `packs/bloodmagic/`, `img/bloodmagic/`
+- **Owner:** WayofTime and the Blood Magic contributors
+- **Source:** <https://github.com/WayofTime/BloodMagic> (branch `1.20.1`)
+- **License:** [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/). A verbatim copy is in [`LICENSES/BloodMagic-LICENSE.md`](LICENSES/BloodMagic-LICENSE.md).
+- **Modifications:** the book was converted from the mod's Patchouli JSON into this viewer's format. The mod's Java page processors, which fill in its recipe and ritual pages, were rewritten in Python. Ritual and Blood Altar structures and ritual costs were read from the mod's Java source. Item icons and block models for 3D structures were rendered from the mod's models and textures. The book's wording is unchanged. `tools/build_bloodmagic.py` performs the conversion.
+
 ## Enigmatic Legacy: The Acknowledgment
 
 - **Files:** `packs/enigmaticlegacy/`, `img/enigmaticlegacy/`, `tools/build_enigmatic.py`
