@@ -1,0 +1,45 @@
+{
+  "mods": [
+    {
+      "id": "enigmaticlegacy",
+      "name": "Enigmatic Legacy",
+      "namespaces": ["enigmaticlegacy"],
+      "authors": ["Aizistral"],
+      "owner": "Aizistral",
+      "url": "https://github.com/Aizistral-Studios/Enigmatic-Legacy",
+      "license": "Enigmatic Legacy License, II Edition",
+      "licenseUrl": "https://github.com/Aizistral-Studios/Enigmatic-Legacy/blob/1.20.X/LICENSE.md",
+      "pack": "packs/enigmaticlegacy/data.json",
+      "used": "The Acknowledgment: its book text, categories, entries, page templates, recipes, GUI and item textures, and item models (rendered into icons).",
+      "changes": "Modified: the book was converted from the mod's Patchouli JSON into this viewer's format and its text resolved from the en_us language file; item icons were rendered from the mod's models; brewing and hidden recipes were transcribed from the mod's Java source; the book's edition line shows the mod's name instead. The book's wording is unchanged. The converter is tools/build_enigmatic.py."
+    },
+    {
+      "id": "goety",
+      "name": "Goety",
+      "namespaces": ["goety"],
+      "authors": ["Polarice3"],
+      "owner": "Polarice3",
+      "url": "https://github.com/Polarice3/Goety-2",
+      "license": "MIT License",
+      "licenseUrl": "https://github.com/Polarice3/Goety-2/blob/1.20/LICENSE.txt",
+      "used": "The Black Book and The Witch's Brews: book text, recipes, textures, item icons and entity models.",
+      "changes": "Converted from the mod's resources into this viewer's format."
+    }
+  ],
+  "other": [
+    {
+      "name": "Patchouli",
+      "authors": ["Vazkii"],
+      "url": "https://github.com/VazkiiMods/Patchouli",
+      "license": "CC BY-NC-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+      "used": "The book interface is a port of Patchouli's book screen, and uses Patchouli's textures and interface text."
+    },
+    {
+      "name": "Minecraft",
+      "authors": ["Mojang Studios"],
+      "url": "https://www.minecraft.net",
+      "used": "Vanilla item and block textures, the font and the button texture. Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft."
+    }
+  ]
+}

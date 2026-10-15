@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Patchouli Books</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: one full-viewport canvas; the book is drawn in GUI pixels exactly like the in-game screen. */
+  :root {
+    --void: #100c0e;        /* world behind the GUI */
+    --ink: #e8dcc2;         /* status text */
+    --ink-dim: #9c8f7a;
+    --font-ui: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body {
+    display: flex;
+    background: var(--void);
+    color: var(--ink);
+    overflow: hidden;
+    padding-left: max(0px, env(safe-area-inset-left, 0px));
+    padding-right: max(0px, env(safe-area-inset-right, 0px));
+    box-sizing: border-box;
+  }
+  #book {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    touch-action: none;
+    cursor: default;
+    image-rendering: pixelated;
+    outline: none;
+  }
+  #status {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding-inline: max(16px, env(safe-area-inset-left, 0px));
+    font: 14px/1.5 var(--font-ui);
+    color: var(--ink-dim);
+    letter-spacing: 0.04em;
+    text-align: center;
+  }
+  #status[hidden] { display: none; }
+  /* off-screen input so phones can type into the book's search field */
+  #search {
+    position: fixed;
+    left: -9999px;
+    top: 50%;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    font-size: 16px;
+  }
+  /* sidebar: every book, grouped by mod, in the colour of the Black Book's pages */
+  #sidebar {
+    --page: #fef9ec;
+    --page-ink: #000000;
+    --page-head: #333333;
+    --page-dim: rgba(0, 0, 0, 0.55);
+    --page-edge: rgba(0, 0, 0, 0.22);
+    --page-hover: rgba(0, 0, 0, 0.07);
+    --page-active: rgba(0, 0, 0, 0.13);
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    width: 248px;
+    height: 100%;
+    box-sizing: border-box;
+    background: var(--page);
+    color: var(--page-ink);
+    border-right: 3px solid var(--page-edge);
+    font: 14px/1.35 var(--font-ui);
+    transition: background-color 0.2s;
+    z-index: 2;
+  }
+  #sidebar[hidden] { display: none; }
+  #sidebar .side-head { flex: none; padding: 14px 14px 10px; border-bottom: 1px solid var(--page-edge); }
+  #sidebar h1 { margin: 0 0 10px; font: 600 15px/1.2 var(--font-ui); letter-spacing: 0.04em; color: var(--page-head); }
+  #book-search {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 9px;
+    font: 14px/1.2 var(--font-ui);
+    color: var(--page-ink);
+    background: var(--page-hover);
+    border: 1px solid var(--page-edge);
+    border-radius: 2px;
+    outline: none;
+  }
+  #book-search::placeholder { color: var(--page-dim); }
+  #book-search:focus { border-color: var(--page-head); background: var(--page-active); }
+  #sidebar .hint { margin: 6px 0 0; font-size: 12px; color: var(--page-dim); }
+  #book-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0; padding: 6px 0 10px; list-style: none; }
+  #book-list .mod { margin: 10px 14px 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--page-head); }
+  #book-list .mod small { font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--page-dim); }
+  #book-list button {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 5px 14px;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+  #book-list button:hover, #book-list button:focus-visible { background: var(--page-hover); outline: none; }
+  #book-list button[aria-current="true"] { background: var(--page-active); font-weight: 600; }
+  #book-list canvas { flex: none; width: 32px; height: 32px; image-rendering: pixelated; }
+  #book-list .empty { margin: 14px; color: var(--page-dim); }
+  #sidebar .side-foot { flex: none; padding: 10px 14px; border-top: 1px solid var(--page-edge); }
+  #credits-btn {
+    width: 100%;
+    padding: 7px 10px;
+    font: 13px/1 var(--font-ui);
+    color: var(--page-head);
+    background: none;
+    border: 1px solid var(--page-edge);
+    cursor: pointer;
+  }
+  #credits-btn:hover, #credits-btn:focus-visible { background: var(--page-hover); outline: none; }
+  #sidebar-toggle, #sidebar-close { display: none; }
+  /* narrow screens: the sidebar becomes a drawer over the book */
+  @media (max-width: 720px) {
+    #sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: min(300px, 85vw);
+      padding-left: env(safe-area-inset-left, 0px);
+      box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+      transform: translateX(-105%);
+      transition: transform 0.2s, background-color 0.2s;
+    }
+    body.drawer-open #sidebar { transform: none; }
+    #sidebar-toggle {
+      display: block;
+      position: fixed;
+      left: max(10px, env(safe-area-inset-left, 0px));
+      top: max(10px, env(safe-area-inset-top, 0px));
+      z-index: 1;
+      padding: 8px 12px;
+      font: 13px/1 var(--font-ui);
+      color: var(--ink);
+      background: rgba(16, 12, 14, 0.8);
+      border: 1px solid #4a3c35;
+      cursor: pointer;
+    }
+    #sidebar-toggle[hidden] { display: none; }
+    #sidebar .side-head { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; }
+    #sidebar .side-head > :not(h1):not(#sidebar-close) { grid-column: 1 / -1; }
+    #sidebar-close { display: block; align-self: start; padding: 2px 8px; font: 18px/1 var(--font-ui); color: var(--page-head); background: none; border: 0; cursor: pointer; }
+  }
+  #credits {
+    width: min(620px, calc(100vw - 32px));
+    max-height: min(80vh, 760px);
+    padding: 0;
+    color: var(--ink);
+    background: #1a1416;
+    border: 1px solid #4a3c35;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  }
+  #credits[open] { display: flex; flex-direction: column; overflow: hidden; }
+  #credits::backdrop { background: rgba(8, 6, 7, 0.7); }
+  #credits .body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 20px 22px 8px; font: 14px/1.55 system-ui, sans-serif; }
+  #credits h2 { margin: 0 0 4px; font: 600 18px/1.3 var(--font-ui); letter-spacing: 0.03em; }
+  #credits h3 { margin: 22px 0 10px; font: 600 12px/1 var(--font-ui); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+  #credits p { margin: 0 0 10px; }
+  #credits .lead { color: var(--ink-dim); }
+  #credits .mod { padding: 12px 0; border-top: 1px solid #2e2427; }
+  #credits .mod-name { font-weight: 600; }
+  #credits .meta { font-size: 13px; color: var(--ink-dim); }
+  #credits a { color: #e0b46a; }
+  #credits .actions { flex: none; margin: 0; display: flex; justify-content: flex-end; padding: 12px 22px; background: #1a1416; border-top: 1px solid #2e2427; }
+  #credits button { font: 13px/1 var(--font-ui); color: var(--ink); background: #2a2024; border: 1px solid #4a3c35; padding: 8px 16px; cursor: pointer; }
+  #credits button:hover, #credits button:focus-visible { border-color: #6b5a48; }
+</style>
+</head>
+<body style="margin:0">
+<aside id="sidebar" aria-label="Books" hidden>
+  <div class="side-head">
+    <h1>Books</h1>
+    <button id="sidebar-close" type="button" aria-label="Close book list">&times;</button>
+    <input id="book-search" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search books or @mod" aria-label="Search books; start a word with @ to search by mod">
+    <p class="hint">Tip: <b>@goety</b> lists one mod's books</p>
+  </div>
+  <ul id="book-list"></ul>
+  <div class="side-foot"><button id="credits-btn" type="button">Credits &amp; licenses</button></div>
+</aside>
+<button id="sidebar-toggle" type="button" aria-controls="sidebar" hidden>&#9776; Books</button>
+<canvas id="book" tabindex="0" aria-label="Patchouli books from Minecraft mods"></canvas>
+<div id="status" role="status">Opening the books...</div>
+<input id="search" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search entries" maxlength="32">
+<dialog id="credits" aria-labelledby="credits-title">
+  <div class="body">
+    <h2 id="credits-title">Credits &amp; licenses</h2>
+    <p class="lead">These books belong to the creators of the mods below. This site does not own any of them; it only presents them in a web version of the in-game book.</p>
+    <div id="credits-mods"></div>
+    <h3>Also used</h3>
+    <div id="credits-other"></div>
+    <p class="meta">Which license covers which file: <a href="LICENSE.md" target="_blank" rel="noopener">LICENSE.md</a>.</p>
+  </div>
+  <form method="dialog" class="actions"><button type="submit">Close</button></form>
+</dialog>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
